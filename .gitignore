@@ -1,2 +1,5 @@
 .DS_Store
 .cursor/
+.pycache/
+__pycache__/
+*.py[cod]
