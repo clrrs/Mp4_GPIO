@@ -57,6 +57,8 @@ Interactive video kiosk: 5 hall-effect sensors trigger 5 videos via VLC on a Ras
 | **GPIO & Sensors** | `pinout` | Show Pi pinout diagram | Identify physical pin locations |
 | | `gpio readall` | Show all pin states (if wiringPi installed) | Visual pin map |
 | **VLC & Audio** | `cvlc --play-and-exit AttractLoop.mp4` | Play a video from CLI | Test video output without the script |
+| | `echo 0 | sudo tee /boot/alsa.txt` | Set script audio target to HDMI | Use when testing/using HDMI audio |
+| | `echo 1 | sudo tee /boot/alsa.txt` | Set script audio target to aux/headphone jack | Switch back to analog output |
 | | `amixer -c 1 cset name='Headphone' 100%` | Set headphone volume to max | Script does this, but useful manually |
 | | `amixer` | Show mixer controls | See available audio devices |
 | | `aplay -l` | List audio playback devices | Identify card numbers (0=HDMI, 1=headphone) |
@@ -162,7 +164,8 @@ python3 /home/pi/mp4m-gpio.py > /tmp/mp4museum.log 2>&1
 - On boot, the `pi` user auto-logs in -> `.bashrc` runs -> script starts
 - **Attract loop**: `AttractLoop.mp4` plays on repeat when no sensor is triggered
 - **Sensor trigger**: A magnet near a hall sensor pulls GPIO LOW -> the matching video plays once -> attract loop resumes
-- **Audio**: Hardcoded to headphone jack (audio device `1`). The script runs `amixer -c 1 cset name='Headphone' 100%` at startup.
+- **Audio**: Select output in `/boot/alsa.txt` (`0` = HDMI, `1` = headphone jack). If missing/invalid, script defaults to `1` (headphone) for safety.
+- **Headphone gain tweak**: `amixer -c 1 cset name='Headphone' ...` is only applied when `/boot/alsa.txt` is set to `1`.
 
 ### Pin -> Video mapping
 
@@ -235,12 +238,21 @@ cvlc --play-and-exit /home/pi/AttractLoop.mp4
 
 ### Audio issues
 
-- **No sound from headphone jack**:
-  - Confirm `audiodevice = "1"` in the script (1 = headphone jack)
+- **Current recommendation**: HDMI audio is working well on this build. Set `/boot/alsa.txt` to `0` for HDMI.
+- **No sound from selected output**:
+  - Confirm current mode: `cat /boot/alsa.txt` (`0` = HDMI, `1` = headphone)
+  - Switch mode if needed:
+    - HDMI: `echo 0 | sudo tee /boot/alsa.txt`
+    - Headphone: `echo 1 | sudo tee /boot/alsa.txt`
+  - Restart script (or reboot) after changing mode
+- **No sound from headphone jack (mode `1`)**:
   - Run `amixer -c 1 cset name='Headphone' 100%` manually
   - Test with `speaker-test -c 2 -t wav`
   - Check `aplay -l` -- card 1 should be `bcm2835 Headphones`
   - Note: `amixer cset numid=3 1` does NOT work on Pi 4. Always use `-c 1 cset name='Headphone'`.
+- **No sound from HDMI (mode `0`)**:
+  - Ensure display is on HDMI-1 (kiosk path)
+  - If needed, uncomment `hdmi_drive=2` in `/boot/config.txt`, then reboot
 - **Crackly / popping audio?** Try these in order:
   1. Lower volume slightly: `amixer -c 1 cset name='Headphone' 90%`
   2. Create `/etc/asound.conf` with buffer tuning:
@@ -253,15 +265,16 @@ defaults.pcm.buffer_time 4000
 ```
 
   3. Check physical connections -- bad ground or cheap cable can cause noise
-- **Want HDMI audio instead?** Change `audiodevice = "1"` to `"0"` in the script, and optionally uncomment `hdmi_drive=2` in `/boot/config.txt`
+- **Want to switch outputs quickly?** Edit only `/boot/alsa.txt` (`0` HDMI / `1` headphone), then restart the script
 - **No audio at all**: Check `dtparam=audio=on` is in `/boot/config.txt`
 - **Save volume changes permanently**: `sudo alsactl store`
 
 #### Field notes: confirmed on current Pi
 
+- HDMI audio path is currently stable and is the preferred output mode for testing.
 - `alsamixer -c 1` **does** change volume while video is running.
 - `vcgencmd get_throttled` is consistently `0x0` (no thermal/undervoltage throttling).
-- Audio-only playback is clean on the Pi; artifacts appear when video+audio run together.
+- On the analog headphone path, audio-only playback is clean but artifacts can appear when video+audio run together.
 - This pattern usually indicates buffering/scheduling pressure in VLC/ALSA under decode load (not a dead headphone port).
 
 #### Continue diagnosis (no `rg` required)

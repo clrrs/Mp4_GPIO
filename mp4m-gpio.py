@@ -13,17 +13,30 @@ import RPi.GPIO as GPIO
 # then reboot and enjoy the interactive!
 
 
-# Read audio device config (0=HDMI, 1=Headphones on this Pi)
-# audiodevice = "0"
-# if os.path.isfile("/boot/alsa.txt"):
-#     with open("/boot/alsa.txt", "r") as f:
-#         audiodevice = f.read(1)
-audiodevice = "1"
+# Read audio device config from /boot/alsa.txt:
+#   "0" = HDMI
+#   "1" = Headphones (aux jack)
+# Missing/invalid file falls back to headphones for museum safety.
+def read_audio_device():
+    default_device = "1"
+    path = "/boot/alsa.txt"
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                value = f.read().strip()[:1]
+                if value in ("0", "1"):
+                    return value
+    except Exception:
+        pass
+    return default_device
+
+
+audiodevice = read_audio_device()
 # Audio: plughw: (not hw:) + one shared VLC Instance — reopening hw: each clip often crackles.
 # Speaker-test clean but script crackly => VLC/ALSA path, not the analog jack.
 # The "video broke" episode was NOT plughw: cmdline video=HDMI-A-2 moves the console to HDMI-2 while VLC/MMAL
 # still draws on HDMI-1, so you see a blank/wrong port. Use HDMI-1 for this kiosk; keep cmdline without that video= line.
-ALSA_CARD = "1"
+ALSA_CARD_HEADPHONE = "1"
 HEADPHONE_LEVEL = 55
 VLC_AUDIO_VOLUME = 70
 
@@ -72,12 +85,15 @@ def get_vlc_core():
     return vlc_core
 
 
-def force_headphone_output():
-    """Set bcm2835 Headphone mixer (see ALSA_CARD / HEADPHONE_LEVEL)."""
+def apply_audio_output():
+    """Apply optional mixer tweaks for selected output."""
+    # HDMI mode does not need the headphone gain tweak.
+    if audiodevice != "1":
+        return
     try:
         os.system(
             "amixer -q -c "
-            + ALSA_CARD
+            + ALSA_CARD_HEADPHONE
             + " cset name='Headphone' "
             + str(HEADPHONE_LEVEL)
             + "% >/dev/null 2>&1"
@@ -166,8 +182,8 @@ def poll_sensors():
 
 
 def main():
-    # Force audio to the headphone jack once at startup
-    force_headphone_output()
+    # Apply startup audio tweak for selected output mode.
+    apply_audio_output()
 
     GPIO.setmode(GPIO.BOARD)
 
