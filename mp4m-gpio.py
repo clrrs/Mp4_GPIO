@@ -16,6 +16,7 @@ import RPi.GPIO as GPIO
 # Read audio device config from /boot/alsa.txt:
 #   "0" = HDMI
 #   "1" = Headphones (aux jack)
+#   "2" = USB DAC (ALSA card index; use plughw:N — confirm N with aplay -l if devices change)
 # Missing/invalid file falls back to headphones for museum safety.
 def read_audio_device():
     default_device = "1"
@@ -24,7 +25,7 @@ def read_audio_device():
         if os.path.isfile(path):
             with open(path, "r", encoding="utf-8") as f:
                 value = f.read().strip()[:1]
-                if value in ("0", "1"):
+                if value in ("0", "1", "2"):
                     return value
     except Exception:
         pass

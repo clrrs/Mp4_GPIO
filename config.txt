@@ -11,7 +11,7 @@ dtparam=audio=on
 # Keep commented unless intentionally testing.
 #audio_pwm_mode=1
 disable_overscan=1
-bootcode_delay=5
+bootcode_delay=1
 
 # optional video and audio config:
 
@@ -19,8 +19,8 @@ bootcode_delay=5
 # this can fix problems with silly projectors or displays
 # remove the # on all three lines below
 #hdmi_ignore_cec=1
-#hdmi_group=1
-#hdmi_mode=16
+hdmi_group=1
+hdmi_mode=16
 
 
 # enable 4k with more than 30hz on raspi 4

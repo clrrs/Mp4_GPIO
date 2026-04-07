@@ -3,3 +3,6 @@
 .pycache/
 __pycache__/
 *.py[cod]
+
+# Large video assets — keep locally or on Drive; GitHub rejects >100MB files
+videos/

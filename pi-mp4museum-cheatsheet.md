@@ -62,7 +62,10 @@ Interactive video kiosk: 5 hall-effect sensors trigger 5 videos via VLC on a Ras
 | | `amixer -c 1 cset name='Headphone' 100%` | Set headphone volume to max | Script does this, but useful manually |
 | | `amixer` | Show mixer controls | See available audio devices |
 | | `aplay -l` | List audio playback devices | Identify card numbers (0=HDMI, 1=headphone) |
-| | `speaker-test -c 2 -t wav` | Play test sound | Confirm audio output works |
+| | `cat /proc/asound/cards` | Short names for each card | Match `CARD=…` in ALSA device strings |
+| | `speaker-test -D plughw:N,0 -c 2 -t wav` | Test **USB DAC** (replace **N** with card #) | After `aplay -l` shows the DAC |
+| | `cvlc -q -A alsa --alsa-audio-device plughw:N /home/pi/video1.mp4` | VLC test: video + **USB** audio | Same **N** as above |
+| | `speaker-test -c 2 -t wav` | Play test sound | Default ALSA device (onboard) |
 | | `alsamixer` | Interactive volume control (TUI) | Adjust levels visually |
 | | `sudo alsactl store` | Save current mixer levels permanently | Persist volume changes across reboots |
 | | `tvservice -s` | Show current HDMI display mode | Check resolution and refresh rate |
@@ -178,6 +181,44 @@ python3 /home/pi/mp4m-gpio.py > /tmp/mp4museum.log 2>&1
 | 5 | 18 | GPIO24 | `video5.mp4` |
 
 All sensors share 3.3V (e.g. pin 1) and GND (e.g. pin 6). No external resistors needed -- internal pull-ups are enabled by the script.
+
+---
+
+## USB DAC (KT USB Audio / Ugreen-class)
+
+Use this section when making the **USB DAC the default** output for VLC / `mp4m-gpio.py`.
+
+### Hardware identity
+
+| Topic | Detail |
+|--------|--------|
+| **Physical** | Cheap class-compliant USB DAC (e.g. Ugreen); often rebadged silicon. |
+| **`lsusb`** | May show **`12d1:0010` Huawei Technologies** — misleading **USB vendor ID reuse** by the OEM. |
+| **`dmesg` (on plug-in)** | Look for **`Product: KT USB Audio`**, **`Manufacturer: KTMicro`**, and `snd-usb-audio`. |
+| **ALSA** | `aplay -l` / `cat /proc/asound/cards` — e.g. **card `2`**, short name **`Audio`**, long name **`KT USB Audio`**. |
+| **Card number** | Not fixed forever: if you add/remove USB devices, **re-check** `aplay -l`. |
+
+### VLC / script ALSA strings
+
+- Prefer **`plughw:N`** (or `plughw:N,0`) — **not** `hw:` — so sample format/rate conversion works.
+- Example when the DAC is **card 2**: `--alsa-audio-device plughw:2`
+- Alternative by name: `sysdefault:CARD=Audio` (if short name stays `Audio`).
+
+### Quick test (Pi)
+
+```bash
+aplay -l
+speaker-test -D plughw:2,0 -c 2 -t wav
+cvlc -q -A alsa --alsa-audio-device plughw:2 /home/pi/video1.mp4
+```
+
+Replace **`2`** with whatever **`aplay -l`** reports for the USB device.
+
+### Notes
+
+- **Power**: Prefer a **direct Pi USB port**; if the dongle resets or drops, try a **powered** hub.
+- **VLC may log** `device cannot be paused` on some USB DACs — usually **harmless**.
+- **Incorporating into `mp4m-gpio.py`**: `/boot/alsa.txt` currently only supports **`0`** (HDMI) and **`1`** (headphone). For USB you will need to **extend** that file (e.g. **`2`**) and pass **`plughw:<n>`** to VLC, **or** set a default PCM device in **`~/.asoundrc`** / **`/etc/asound.conf`** for the USB card (watch for **card order** if multiple USB gadgets appear).
 
 ---
 
